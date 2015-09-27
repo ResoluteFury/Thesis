@@ -6,6 +6,10 @@ a serial ppm-sum receiver (xbee + arduino pro).
 import time
 from datetime import datetime
 import serial
+import os
+import sys
+import socket
+
 try:
     import pygame.joystick
 except ImportError:
@@ -14,13 +18,15 @@ except ImportError:
 
 __author__ = 'Aaron Wood'
 
+os.environ["SDL_VIDEODRIVER"] = "dummy"
+
 
 XBEE_DESTINATION_NODE = 'XbeeThesis'
-BAUD_RATE = 38400
 SERIAL_PORT = 'socket://192.168.1.101:9750'
+BAUD_RATE = 38400
 
 # 50hz
-FREQUENCY = float(1 / 100)
+FREQUENCY = float(1 / 100.0)
 
 MIN_PPM = 0
 MAX_PPM = 250
@@ -77,7 +83,7 @@ class ControllerState(object):
     def __init__(self):
         # Initialize PyGame
         pygame.joystick.init()
-        #  pygame.display.init()
+        pygame.display.init()
 
         if not pygame.joystick.get_count():
             print "Please connect a joystick and run again."
@@ -108,12 +114,9 @@ class ControllerState(object):
             axis = e.axis
             if axis not in self.axes:
                 return
-
             axis_type, mul, offset = self.jsmap[axis]
-            value = max(min(e.value * mul + offset, MAX_PPM), MIN_PPM)
+            value = int(max(min(e.value * mul + offset, MAX_PPM), MIN_PPM))
             self.state[axis_type] = value
-
-            print 'Axis: %d, value: %.2f' % (axis, value)
 
         # Button Presses (toggle)
         elif e.type == pygame.JOYBUTTONDOWN:
@@ -128,7 +131,8 @@ class ControllerState(object):
 
 # Main method
 def main():
-    with serial.serial_for_url(SERIAL_PORT, BAUD_RATE, timeout=0) as xbee:
+
+    with serial.serial_for_url(SERIAL_PORT, baudrate=BAUD_RATE, parity=serial.PARITY_NONE, stopbits=serial.STOPBITS_ONE, bytesize=serial.EIGHTBITS) as xbee:
         controller_state = ControllerState()
         watchdog_timer = 0
 
@@ -136,13 +140,12 @@ def main():
         while True:
             poll_started = datetime.now()
 
-            while True:
-                # Process joystick events
-                for e in pygame.event.get():
-                    if e.type in (pygame.JOYAXISMOTION, pygame.JOYBUTTONDOWN, pygame.JOYBUTTONUP, pygame.JOYHATMOTION):
-                        controller_state.handle_joy_event(e)
-                    if e.type == pygame.NOEVENT:
-                        break
+            # Process joystick events
+            for e in pygame.event.get():
+                if e.type in (pygame.JOYAXISMOTION, pygame.JOYBUTTONDOWN, pygame.JOYBUTTONUP, pygame.JOYHATMOTION):
+                    controller_state.handle_joy_event(e)
+                if e.type == pygame.NOEVENT:
+                    break
 
             # Sleep only long enough to keep the output at 50Hz
             poll_ended = datetime.now()
