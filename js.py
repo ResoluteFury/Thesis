@@ -31,33 +31,22 @@ FREQUENCY = float(1 / 100.0)
 MIN_PPM = 0
 MAX_PPM = 250
 
-AXIS_ROLL = 2
-AXIS_PITCH = 3
-AXIS_THROTTLE = 13
-AXIS_YAW = 0
-
-BUTTON_AUX1 = 1  # Button 2
-BUTTON_AUX2 = 2  # Button 2
-BUTTON_AUX3 = 3  # Button 3
-BUTTON_AUX4 = 0  # Trigger
 
 '''
 joymap stores the mappings from axis to function of axis
 This allows us to extend the controller functionality to new controller types without
 rewriting the joystick event handler
 
-Controllers are stored as dictionaries. At minimum, the dictionary must contain usable_axes, roll, pitch, throttle,
-and yaw entries.
+Controllers are stored as dictionaries.
 '''
 
 joymap = {
     'Sony PLAYSTATION(R)3 Controller':
         {
-            'usable_axes': [0, 2, 3, 13],
-            0: ('yaw', 125, 125),
+            'usable_axes': [1, 2, 3],
+            1: ('yaw', 125, 125),
             2: ('roll', 125, 125),
-            3: ('pitch', 125, 125),
-            13: ('throttle', 250, 250),
+            3: ('pitch', 125, 125)
         }
 }
 
@@ -120,13 +109,16 @@ class ControllerState(object):
 
         # Button Presses (toggle)
         elif e.type == pygame.JOYBUTTONDOWN:
-            # For future expansion
-            if e.button == 0:
-                self.disable = True
-                self.state['aux2'] = MIN_PPM
-            if e.button == 3:
-                self.disable = False
-                self.state['aux2'] = MAX_PPM
+            value = int(self.state['throttle'])
+            if e.button == 10:  # Left Bumper
+                value -= 25
+            if e.button == 8:   # Left Trigger
+                value -= 5
+            if e.button == 11:  # Right Bumper
+                value += 25
+            if e.button == 9:   # Right Trigger
+                value += 5
+            self.state['throttle'] = max(min(value, MAX_PPM), MIN_PPM)
 
 
 # Main method
@@ -156,7 +148,6 @@ def main():
                 xbee.write(controller_state.serial_format())
 
             write_ended = datetime.now()
-
             watchdog_timer += (write_ended - poll_started).microseconds
 
             # Print out the state every once in a while to make sure the program hasn't died
